@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Management</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Salina', sans-serif;
+            margin: 0;
+            background: white;
+            color: #0A1931;
+            text-align: center;
+        }
+        .sidebar {
+            width: 100%;
+            background: #0A1931;
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            align-items: center;
+        }
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .sidebar a:hover {
+            background: #1F4068;
+        }
+        .container {
+            padding: 70px 20px 20px;
+            background: white;
+            border-radius: 10px;
+            margin: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        input, button {
+            margin: 10px;
+            padding: 12px;
+            border-radius: 5px;
+            border: none;
+        }
+        input {
+            border: 2px solid #0A1931;
+        }
+        button {
+            background: #0A1931;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #162447;
+        }
+        .section {
+            margin-bottom: 50px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #0A1931;
+            padding: 10px;
+            text-align: center;
+        }
+        @media (max-width: 600px) {
+            .sidebar {
+                flex-direction: column;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <a onclick="scrollToSection('home')">🏠 Home</a>
+        <a onclick="scrollToSection('inventory')">📦 Items & Inventory</a>
+        <a onclick="scrollToSection('orders')">💳 Orders & Payments</a>
+        <a onclick="scrollToSection('customers')">👥 Customers</a>
+        <a onclick="scrollToSection('reports')">📊 Reports</a>
+        <a onclick="scrollToSection('settings')">⚙ Settings</a>
+    </div>
+    
+    <div class="container">
+        <div id="home" class="section">
+            <h2>🏠 Home</h2>
+        </div>
+        <div id="inventory" class="section">
+            <h2>📦 Inventory Management</h2>
+            <input type="text" id="name" placeholder="Item Name">
+            <input type="number" id="quantity" placeholder="Quantity">
+            <input type="number" id="price" placeholder="Price">
+            <button onclick="addItem()">➕ Add Item</button>
+            <h3>📋 Items List</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="items-list"></tbody>
+            </table>
+        </div>
+        <div id="orders" class="section">
+            <h2>💳 Orders & Payments</h2>
+            <p>Track all customer orders and their payment status.</p>
+        </div>
+        <div id="customers" class="section">
+            <h2>👥 Customers</h2>
+            <p>Manage customer information, track returning customers, and view spending habits.</p>
+        </div>
+        <div id="reports" class="section">
+            <h2>📊 Reports</h2>
+            <canvas id="salesChart"></canvas>
+            <p>Analyze sales trends and revenue reports with predictive insights.</p>
+        </div>
+        <div id="settings" class="section">
+            <h2>⚙ Settings</h2>
+            <p>Adjust application preferences, user roles, and enable notifications.</p>
+        </div>
+    </div>
+
+    <script>
+        function scrollToSection(sectionId) {
+            document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function fetchItems() {
+            try {
+                const response = await fetch('http://localhost:5000/products');
+                const items = await response.json();
+                const tableBody = document.getElementById('items-list');
+
+                if (!tableBody) {
+                    console.error("Table body with ID 'items-list' not found.");
+                    return;
+                }
+
+                tableBody.innerHTML = ""; // Clear previous data
+
+                items.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.name}</td>
+                        <td>${item.quantity}</td>
+                        <td>${item.price}</td>
+                        <td><button onclick="deleteItem(${item.id})">🗑 Delete</button></td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error fetching items:', error);
+            }
+        }
+
+        async function addItem() {
+            const name = document.getElementById('name').value.trim();
+            const quantity = document.getElementById('quantity').value.trim();
+            const price = document.getElementById('price').value.trim();
+
+            if (!name || !quantity || !price) {
+                alert("Please fill all fields.");
+                return;
+            }
+
+            const item = { name, quantity: parseInt(quantity), price: parseFloat(price) };
+
+            try {
+                const response = await fetch('http://localhost:5000/products', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item),
+                });
+
+                if (!response.ok) throw new Error('Failed to add item');
+
+                fetchItems(); // Refresh the table
+                document.getElementById('name').value = "";
+                document.getElementById('quantity').value = "";
+                document.getElementById('price').value = "";
+            } catch (error) {
+                console.error('Error adding item:', error);
+            }
+        }
+
+        async function deleteItem(id) {
+            try {
+                const response = await fetch(http://localhost:5000/products/${id}, {
+                    method: 'DELETE',
+                });
+
+                if (!response.ok) throw new Error('Failed to delete item');
+
+                fetchItems();
+            } catch (error) {
+                console.error('Error deleting item:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchItems);
+    </script>
+</body>
+</html>
